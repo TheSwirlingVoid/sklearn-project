@@ -1,27 +1,34 @@
+import sys
 from sklearn import datasets, svm
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.utils import Bunch
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas
 import cv2 as cv
 
-DATASET_FOLDER = "archive/letters"
+DATASET_FOLDER = "archive/letters2"
 
 class LetterDatasetHandler():
 
 	def __init__(self, datafile) -> None:
 		self.datafile = datafile
 		self.data = None
+		self.csv = None
 # ---------------------------------------------------------------------------- #
 	def load_data(self) -> None:
 		self.data = Bunch()
 		
-		csv = pandas.read_csv(self.datafile)
+		self.csv = pandas.read_csv(self.datafile)
 		# add folder prefix to prime image reading
-		csv["file"] = DATASET_FOLDER+"/"+csv["file"]
-		paths = csv["file"].to_numpy()
+		self.csv["file"] = DATASET_FOLDER+"/"+self.csv["file"]
+		paths = self.csv["file"].to_numpy()
 		#-----------------------------------------------------#
-		self.data["features"] = csv.columns.values
-		self.data["target_names"] = csv["letter"].unique()
+		self.data["features"] = self.csv.columns.values
+		self.data["class_targets"] = np.empty((0))
+		self.data["possible_results"] = self.csv["letter"].unique()
 
 		self.data["images"] = \
 			self.__paths_to_image_array(paths)
@@ -31,21 +38,25 @@ class LetterDatasetHandler():
 # ---------------------------------------------------------------------------- #
 	def __paths_to_image_array(self, paths):
 
-		entries = len(paths)
 		x_dim = cv.imread(paths[0]).shape[1]
 		y_dim = cv.imread(paths[0]).shape[0]
-		# BLANK n-dimensional array for images; this is so we don't get a
-		# nested list
-		img_array = np.zeros(
-			(entries, y_dim, x_dim)
-		)
+		img_array = np.empty((0, x_dim, y_dim))
+
 		# populate image ndarray with all images
 		for idx in range(len(paths)):
 			path = paths[idx]
 			image = self.__get_gray_img(path)
-			np.append(img_array, image)
+			# only add the image if it fits the dimension requirement
+			if image.shape[1] == x_dim and image.shape[0] == y_dim:
+				# brackets around image to add a dimension (2->3)
+				img_array = np.append(img_array, [image], axis=0)
+				self.__add_class_target(self.csv["letter"][idx])
 
 		return img_array
+# ---------------------------------------------------------------------------- #
+	def __add_class_target(self, target) -> None:
+		self.data["class_targets"] = \
+			np.append(self.data["class_targets"], target)
 # ---------------------------------------------------------------------------- #
 	def __flatten_image_array(self, img_array):
 		return \
@@ -64,16 +75,44 @@ class LetterDatasetHandler():
 
 def main() -> None:
 
-	# TARGET = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]
-
 	dh = LetterDatasetHandler(DATASET_FOLDER+".txt")
 	dh.load_data()
 
 	data = dh.get_data()
 
-	print(data["flattened_images"].shape)
+	npredict = 10
 
-	# clf = svm.SVC(gamma=0.001, C=100.)
-	# clf.fit(data["flattened_images"], data["targets"])
+	# estimator
+	clf = svm.SVC()
+
+	train_data, test_data, train_sol, test_sol = \
+		train_test_split(
+			data["flattened_images"], data["class_targets"],
+			test_size=npredict,
+			random_state=142 # some random random seed or something idk
+		)
+
+	# num-of-images samples, num-of-pixels features
+	clf.fit(train_data, train_sol)
+
+	print("Training done!")
+
+	print("Possible results:")
+	print(data["possible_results"])
+
+	predictions = clf.predict(test_data)
+
+	cm = confusion_matrix(test_sol, predictions)
+	cm_display = ConfusionMatrixDisplay(cm).plot()
+	plt.show()
+# ---------------------------------------------------------------------------- #
+	# while True:
+	# 	input_num = input("Enter the relative path to an image to predict: ")
+	# 	img = cv.imread(input_num)
+	# 	img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+	# 	img = [img.flatten()]
+		
+	# 	result = str(clf.predict(img))
+	# 	print("Predicted: " + result)
 
 main()
