@@ -17,6 +17,7 @@ from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import Bunch
+from datetime import datetime
 
 DATASET_FOLDER = "archive/letters3"
 
@@ -196,11 +197,16 @@ class Predictor():
         # clf = LinearDiscriminantAnalysis()
 
         # thanks sklearn for being almost absolutely useless
+        timeStart = datetime.now()
 
         print("Training with " + str(len(self.train_data)) + " entries")
         clf.fit(self.train_data, self.train_sol)
         print("Training done!")
         self.predictions = clf.predict(self.test_data)
+
+        timeEnd = datetime.now()
+        timeDelta = (timeEnd - timeStart)
+        print(timeDelta)
 
     def calculate_percent_accuracy(self) -> float:
         """
