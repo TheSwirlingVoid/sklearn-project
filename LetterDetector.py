@@ -206,7 +206,7 @@ class Predictor():
 
         timeEnd = datetime.now()
         timeDelta = (timeEnd - timeStart)
-        print(timeDelta)
+        print("Training time:", timeDelta)
 
     def calculate_percent_accuracy(self) -> float:
         """
